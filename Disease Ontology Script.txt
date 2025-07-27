@@ -1,0 +1,44 @@
+library(DOSE)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+
+gene_symbols <- c("HGS","PRKDC","MET","PRKCZ","PTK2","PRPF6","CDK8")
+gene_list <- bitr(gene_symbols, fromType = "SYMBOL", toType = "ENTREZID", OrgDb = org.Hs.eg.db)$ENTREZID
+print(gene_list)
+
+gene_list <- c("9146","5591","4233","5747","5590","24148","1024") 
+do_enrich <- enrichDO(gene = gene_list, ont = "DO", pvalueCutoff=0.05)
+head(do_enrich)
+summary(do_enrich)
+do_enrich_df <- as.data.frame(do_enrich)
+print(do_enrich_df)
+
+id_to_symbol <- bitr(gene_list, 
+                     fromType = "ENTREZID", 
+                     toType = "SYMBOL", 
+                     OrgDb = org.Hs.eg.db)
+
+
+do_enrich@result$geneID <- sapply(do_enrich@result$geneID, function(ids) {
+  symbols <- id_to_symbol$SYMBOL[id_to_symbol$ENTREZID %in% strsplit(ids, "/")[[1]]]
+  paste(symbols, collapse = "/")
+})
+
+library(openxlsx)
+write.xlsx(do_enrich, file = "D:/disease/do_enrich.xlsx")
+
+library(readxl)
+do_enrich_filtered <- read_excel("D:/disease/do_enrich.xlsx")        #Filter out the redundancy
+
+
+str(do_enrich_filtered)
+library(tidyr)
+df_split <- do_enrich_filtered %>%
+  separate_rows(geneID, sep = "/")
+
+
+library(ggplot2)
+ggplot(df_split, aes(y = Description, fill = geneID)) +
+  geom_bar() +
+  theme_minimal() +
+  labs(title = "Disease associations of the hub genes", y = "", x = "Gene")
